@@ -139,7 +139,8 @@ export default function ChatGPT() {
   const LLM = async(prompt:string)=>{
 
     try{
-      const url = `http://localhost:8000/api/v1/chat/stream?prompt=${prompt}`
+      //const url = `http://localhost:8000/api/v1/chat/stream?prompt=${prompt}`
+      const url = `/api/v1/chat/stream?prompt=${encodeURIComponent(prompt)}`
       writeToPage(prompt,url)
 
     }catch(error){
