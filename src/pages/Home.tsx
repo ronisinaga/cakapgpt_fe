@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, Grid, HelpCircle} from "react-feather";
+import { Menu, Grid,Airplay,BarChart} from "react-feather";
 import ChatGPT from "../components/ChatGPT";
 
 
@@ -31,7 +31,13 @@ const Home = () => {
     {
       key: "ml",
       label: "Machine Learning",
-      icon: HelpCircle,
+      icon: BarChart,
+      children: [],
+    },
+    {
+      key: "dl",
+      label: "Deep Learning",
+      icon: Airplay,
       children: [],
     },
   ];
