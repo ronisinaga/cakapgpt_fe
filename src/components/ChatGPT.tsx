@@ -161,7 +161,7 @@ export default function ChatGPT() {
             alt="CakapGPT Logo"
             className="w-20 h-10 object-contain rounded-md"
           />
-          <div className="text-sm font-semibold">Smart Conversation with CakapGPT</div>
+          <div className="text-sm font-semibold">Smart AI Conversation with CakapGPT</div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -198,7 +198,7 @@ export default function ChatGPT() {
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Tulis pertanyaan..."
+            placeholder="Write your discussion..."
             className="flex-1 resize-none outline-none bg-transparent p-2"
           />
           <div className="flex items-center gap-2">
@@ -208,7 +208,7 @@ export default function ChatGPT() {
               className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-md disabled:opacity-50"
             >
               <Send size={16} />
-              <span className="text-sm">Kirim</span>
+              <span className="text-sm">Send</span>
             </button>
           </div>
         </div>

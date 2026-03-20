@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, Grid, HelpCircle, Type, FileText, Globe, MessageSquare, BarChart2, Layers, Award } from "react-feather";
+import { Menu, Grid, HelpCircle} from "react-feather";
 import ChatGPT from "../components/ChatGPT";
 
 
@@ -12,6 +12,8 @@ const Home = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
+  // Tambahkan state ini di dalam komponen Home
+  const [activeMenu, setActiveMenu] = useState<string>("cakapgpt"); // default CakapGPT
   
   const toggleMenu = (key: string) => {
     setOpenMenus((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -23,16 +25,14 @@ const Home = () => {
       label: "Large Language Model (LLM)",
       icon: Grid,
       children: [
-        { label: "CakapGPT", image: "/assets/cakapgpt.jpg" },
+        { label: "CakapGPT", image: "/assets/cakapgpt.jpg", key: "cakapgpt" },
       ],
     },
     {
       key: "ml",
       label: "Machine Learning",
       icon: HelpCircle,
-      children: [
-        
-      ],
+      children: [],
     },
   ];
 
@@ -42,7 +42,8 @@ const Home = () => {
     icon: React.ComponentType<{ size?: number; className?: string }>;
     children: {
       label: string;
-      image: string; // ← ganti dari icon ke image
+      image: string;
+      key: string;
     }[];
   };
 
@@ -92,7 +93,7 @@ const Home = () => {
 
             {!isCollapsed && (
               <span className="font-bold text-xl text-gray-800 tracking-wide">
-                - Large Language Model (LLM) & Machine Learning Application
+                - Large Language Model (LLM), Machine Learning and Deep Learning Application
               </span>
             )}
           </div>
@@ -149,7 +150,12 @@ const Home = () => {
                       {item.children.map((child, idx) => (
                         <li
                           key={idx}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-gray-100 text-gray-600 text-[13px]"
+                          onClick={() => setActiveMenu(child.key)}
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-[13px]
+                          ${activeMenu === child.key
+                            ? "bg-blue-50 text-blue-600 font-medium"
+                            : "hover:bg-gray-100 text-gray-600"
+                          }`}
                         >
                           <img
                             src={child.image}
@@ -176,7 +182,14 @@ const Home = () => {
         )}
 
         {/* MAIN CONTENT */}
-        <div className="flex-1 overflow-auto p-6"><ChatGPT /></div>
+        <div className="flex-1 overflow-auto p-6">
+          {activeMenu === "cakapgpt" && <ChatGPT />}
+          {activeMenu === "" && (
+            <div className="flex items-center justify-center h-full text-gray-400">
+              Pilih menu untuk memulai
+            </div>
+          )}
+        </div>
         {/* RIGHT SIDEBAR */}
         <aside
           className="bg-white border-l border-gray-200 shadow-sm transition-all duration-200 flex flex-col"
@@ -199,18 +212,70 @@ const Home = () => {
           {!isRightCollapsed && (
             <div className="flex-1 overflow-auto p-4 text-sm text-gray-700 space-y-6">
 
+              {/* Foto & Nama */}
               <section className="text-center">
-                <h3 className="font-medium mb-2">Roni Fitriandi Sinaga</h3>
-
-                <img 
-                  src="/assets/foto3x4.jpg" 
-                  alt="Founder" 
-                  className="w-32 h-auto mx-auto rounded-lg border shadow-md"
+                <img
+                  src="/assets/foto3x4.jpg"
+                  alt="Founder"
+                  className="w-24 h-24 mx-auto rounded-full border-4 border-blue-100 shadow-md object-cover"
                 />
+                <h3 className="font-semibold text-base mt-3 text-gray-800">Roni Fitriandi Sinaga</h3>
+                <p className="text-xs text-blue-500 font-medium mt-1">AI & Machine Learning Enthusiast</p>
+                <p className="text-xs text-gray-400 mt-0.5">Magister Student at Pamulang University (Universitas Pamulang)</p>
+              </section>
 
-                <p className="text-xs text-gray-500 mt-2">
-                  Mahasiswa S2 Universitas Pamulang
-                </p>
+              {/* Divider */}
+              <hr className="border-gray-10" />
+
+              {/* Bio */}
+              <section className="space-y-3">
+                <div className="flex items-start gap-2">
+                  <span className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold flex-shrink-0 mt-0.5">
+                    AI
+                  </span>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Has a lot of interest in{" "}
+                    <span className="font-medium text-gray-800">AI</span>,{" "}
+                    <span className="font-medium text-gray-800">Machine Learning</span>, and{" "}
+                    <span className="font-medium text-gray-800">Deep Learning</span> and tries to
+                    implement them into applications that can help people understand them.
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <span className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-[9px] text-white font-bold flex-shrink-0 mt-0.5">
+                    ERP
+                  </span>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Also has advanced knowledge in{" "}
+                    <span className="font-medium text-gray-800">ERP (Enterprise Resource Planning)</span>.
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <span className="w-6 h-6 rounded-full bg-violet-500 flex items-center justify-center text-[11px] text-white flex-shrink-0 mt-0.5">
+                    🤝
+                  </span>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Happy to collaborate with people in developing AI, Machine Learning, and Deep
+                    Learning applications.
+                  </p>
+                </div>
+              </section>
+
+              {/* Divider */}
+              <hr className="border-gray-10" />
+
+              {/* Contact */}
+              <section>
+                <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">Contact</p>
+                
+                <a href="mailto:dragonif01@gmail.com"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 transition text-blue-600 text-xs font-medium"
+                >
+                  <span>✉️</span>
+                  dragonif01@gmail.com
+                </a>
               </section>
             </div>
           )}
@@ -220,7 +285,7 @@ const Home = () => {
 
       {/* FOOTER */}
       <footer className="h-12 border-t bg-white flex items-center justify-center text-sm text-gray-500">
-        © {new Date().getFullYear()} — Dibuat Oleh Roni F Sinaga untuk mengimplementasikan materi S2 dengan ❤️
+        © {new Date().getFullYear()} — Developed by Roni Fitriandi Sinaga to implement knowledge and experience in AI, Machine Learning and Deep Learning ❤️
       </footer>
     </div>
   );
