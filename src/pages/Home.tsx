@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, Grid, HelpCircle, Folder } from "react-feather";
+import { Menu, Grid, HelpCircle, Type, FileText, Globe, MessageSquare, BarChart2, Layers, Award } from "react-feather";
 import ChatGPT from "../components/ChatGPT";
+
 
 const Home = () => {
   const [input, setInput] = useState("");
@@ -10,20 +11,46 @@ const Home = () => {
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const streamingBuffer = useRef("");
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
+  
+  const toggleMenu = (key: string) => {
+    setOpenMenus((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const menuTree = [
+    {
+      key: "llm",
+      label: "Large Language Model (LLM)",
+      icon: Grid,
+      children: [
+        { label: "CakapGPT", image: "/assets/cakapgpt.jpg" },
+      ],
+    },
+    {
+      key: "ml",
+      label: "Machine Learning",
+      icon: HelpCircle,
+      children: [
+        
+      ],
+    },
+  ];
+
+  type MenuItem = {
+    key: string;
+    label: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    children: {
+      label: string;
+      image: string; // ← ganti dari icon ke image
+    }[];
+  };
 
   const MIN_WIDTH = 60;
   const MAX_WIDTH = 550;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (input.trim()) navigate("/linear", { state: { question: input } });
-  };
-
   const startDragging = () => !isCollapsed && setIsDragging(true);
   const stopDragging = () => setIsDragging(false);
-  const [message, setMessage] = useState([{ sender: "ai", text: "" }]);
-  const lastUpdate = useRef(Date.now());
   const [isRightCollapsed, setIsRightCollapsed] = useState(false);
   const [rightWidth, setRightWidth] = useState(280);
 
@@ -65,7 +92,7 @@ const Home = () => {
 
             {!isCollapsed && (
               <span className="font-bold text-xl text-gray-800 tracking-wide">
-                - Mini AI
+                - Large Language Model (LLM) & Machine Learning Application
               </span>
             )}
           </div>
@@ -84,18 +111,56 @@ const Home = () => {
           <div className="px-4 py-5">
             {!isCollapsed && <h2 className="font-semibold text-lg mb-4">Menu</h2>}
 
-            <ul className="space-y-4">
-              {[
-                { label: "Persamaan Linear", icon: Grid },
-                { label: "Optimasi", icon: Folder },
-                { label: "Machine Learning", icon: HelpCircle },
-              ].map((item, i) => (
-                <li
-                  key={i}
-                  className="flex items-center gap-3 cursor-pointer hover:text-black text-gray-700 text-[15px]"
-                >
-                  <item.icon size={20} />
-                  {!isCollapsed && <span>{item.label}</span>}
+            <ul className="space-y-1">
+              {menuTree.map((item) => (
+                <li key={item.key}>
+                  {/* Parent item */}
+                  <div
+                    className="flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer hover:bg-gray-100 text-gray-700 text-[14px] select-none"
+                    onClick={() => toggleMenu(item.key)}
+                  >
+                    <item.icon size={18} />
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1">{item.label}</span>
+
+                        {/* Badge jumlah children */}
+                        <span className="text-[11px] bg-gray-100 text-gray-500 rounded-full px-1.5 py-0.5 leading-none">
+                          {item.children.length}
+                        </span>
+
+                        {/* Chevron */}
+                        <span
+                          className="text-gray-400 text-xs transition-transform duration-200 ml-1"
+                          style={{
+                            display: "inline-block",
+                            transform: openMenus[item.key] ? "rotate(90deg)" : "rotate(0deg)",
+                          }}
+                        >
+                          ›
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Children */}
+                  {!isCollapsed && openMenus[item.key] && (
+                    <ul className="ml-5 border-l border-gray-200 pl-2 mt-1 space-y-1">
+                      {item.children.map((child, idx) => (
+                        <li
+                          key={idx}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-gray-100 text-gray-600 text-[13px]"
+                        >
+                          <img
+                            src={child.image}
+                            alt={child.label}
+                            className="w-5 h-5 rounded object-cover flex-shrink-0"
+                          />
+                          {child.label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>

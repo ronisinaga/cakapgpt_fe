@@ -1,68 +1,22 @@
-//import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { useMemo,useState, useEffect } from "react";
+import "katex/dist/katex.min.css";
+import { useState, useEffect } from "react";
 
 interface Props {
   content: string;
+  isStreaming?: boolean;
 }
 
-function normalizeMarkdown_old(text: string) {
-  return text
-    .replace(/•\s*/g, "- ")
-    .replace(/<br\s*\/?>/gi, "\n")
-    // Convert \[...\] ke $$...$$
-    .replace(/\\\[([\s\S]*?)\\\]/g, "$$$$\n$1\n$$$$")
-    // Convert \(...\) ke $...$
-    .replace(/\\\(([\s\S]*?)\\\)/g, "$$$1$$")
-    // Escape | di dalam formula $ $
-    .replace(/\$([^$]*)\|([^$]*)\$/g, "$$$1\\|$2$$")
-    // Fix: teks yang diakhiri $$ tapi tidak diawali $$
-    .replace(/(^|\n)([^$\n][^\n]*?[^$])\$\$(\n|$)/g, "$1\$\$$2\$\$$3")
-    // Fix: $$formula tanpa penutup → $$formula$$
-    .replace(/\$\$((?:[^$]|\n(?!\n))+?)(?=\n\n|$)/g, (_, content) => `$$${content}$$`)
-    // Fix: angka$ → angka (hapus $ simbol mata uang setelah angka)
-    .replace(/(\d)\$(?!\$)/g, "$1");
-}
-
-function normalizeMarkdown_old1(text: string) {
-  return text
-    .replace(/•\s*/g, "- ")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/\\\[([\s\S]*?)\\\]/g, "$$$$\n$1\n$$$$")
-    .replace(/\\\(([\s\S]*?)\\\)/g, "$$$1$$")
-    // Fix: **teks $x** → **teks x** (hapus $ yang nyasar di dalam bold)
-    .replace(/(\*\*[^*]*?)\$([^*]*?\*\*)/g, "$1$2")
-    // Fix: kalau ada $$ penutup, pastikan pembukaannya juga $$
-    .replace(/(?<!\$)\$((?:[^$]|\n)+?)\$\$/g, (_, content) => `$$${content}$$`)
-    .replace(/(^|\n)([^$\n][^\n]*?[^$])\$\$(\n|$)/g, "$1\$\$$2\$\$$3")
-    // Fix: $$formula tanpa penutup → $$formula$$
-    .replace(/\$\$((?:[^$]|\n(?!\n))+?)(?=\n\n|$)/g, (_, content) => `$$${content}$$`)
-    // Fix: angka$ → angka (hapus $ simbol mata uang setelah angka)
-    .replace(/(\d)\$(?!\$)/g, "$1");
-}
-
-function normalizeMarkdown_old2(text: string) {
-  const result = text
-    .replace(/•\s*/g, "- ")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/\\\[([\s\S]*?)\\\]/g, "$$$$\n$1\n$$$$")
-    .replace(/\\\(([\s\S]*?)\\\)/g, "$$$1$$")
-    // Fix: baris yang mengandung LaTeX command tapi tidak ada delimiter
-    .replace(/^(?!\s*\$\$)(\s*\\[a-zA-Z]+.*)$/gm, (match) => {
-      // Skip kalau sudah punya delimiter
-      if (match.includes("$$") || match.includes("\\[") || match.includes("\\(")) {
-        return match;
-      }
-      return `$$${match.trim()}$$`;
-    })
-    // Fix: pastikan $$ selalu dikelilingi newline agar bold di baris lain tidak pecah
-    .replace(/\$\$([\s\S]*?)\$\$/g, (_, content) => `\n$$${content}$$\n`);
-
-    console.log("Normalized",result);
-    return result;
+function useDebounce(value: string, delay: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
 }
 
 function normalizeMarkdown(text: string) {
@@ -70,41 +24,94 @@ function normalizeMarkdown(text: string) {
     .replace(/•\s*/g, "- ")
     .replace(/<br\s*\/?>/gi, "\n");
 
-  // Konversi \[...\] ke $$ block dengan newline di dalam
+  // Simpan semua block math dulu sebelum diproses
+  const mathBlocks: string[] = [];
+  const mathInlines: string[] = [];
+
+  // Ekstrak \[...\] supaya | di dalamnya tidak merusak tabel
   result = result.replace(/[ \t]*\\\[([\s\S]*?)\\\]/g, (_, content) => {
-    return `\n\n$$\n${content.trim()}\n$$\n\n`;
+    const idx = mathBlocks.length;
+    mathBlocks.push(`\n\n$$\n${content.trim()}\n$$\n\n`);
+    return `%%MATHBLOCK_${idx}%%`;
   });
 
-  // Konversi \(...\) ke $...$ inline
+  // Ekstrak \(...\) supaya | di dalamnya tidak merusak tabel
   result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_, content) => {
-    return `$${content.trim()}$`;
+    const idx = mathInlines.length;
+    mathInlines.push(`$${content.trim()}$`);
+    return `%%MATHINLINE_${idx}%%`;
+  });
+
+  // ✅ FIX: Pastikan ada baris kosong antara teks/label dan baris tabel pertama
+  // Menangkap kasus: "**Label:**\n| ..." → "**Label:**\n\n| ..."
+  result = result.replace(/([^\n])\n(\|)/g, "$1\n\n$2");
+
+  // Hapus baris kosong di dalam blok tabel
+  let prev = "";
+  while (prev !== result) {
+    prev = result;
+    result = result.replace(/(\|[^\n]+)\n[ \t]*\n(\|)/g, "$1\n$2");
+  }
+
+  // Hapus indentasi di depan baris tabel
+  result = result.replace(/^[ \t]+(\|)/gm, "$1");
+
+  // Pastikan ada baris kosong setelah tabel
+  result = result.replace(/(\|[^\n]+)\n([^\n|])/g, "$1\n\n$2");
+
+  // ✅ FILTER: Pisahkan baris tabel yang berisi teks panjang (bukan data)
+  result = result.replace(/^(\|)(.+)(\|)$/gm, (line) => {
+    const cells = line
+      .split("|")
+      .slice(1, -1)
+      .map((c) => c.trim());
+
+    // Cek apakah sel pertama adalah teks panjang (kalimat)
+    const firstCell = cells[0] ?? "";
+    console.log("Cek first sel\n")
+    console.log(firstCell)
+    const isSeparatorRow = /^[\s\-:]+$/.test(firstCell);
+    const isDataRow = /^[\d\/\.\-\+\s%a-zA-Z_]{0,15}$/.test(firstCell);
+
+    if (!isSeparatorRow && !isDataRow && firstCell.length > 15) {
+      // Keluarkan dari tabel, jadikan paragraf biasa
+      return `\n${cells.filter(c => c).join(" ")}\n`;
+    }
+    return line;
   });
 
   // Bersihkan newline berlebihan
   result = result.replace(/\n{3,}/g, "\n\n");
 
+  // Kembalikan math block
+  result = result.replace(/%%MATHBLOCK_(\d+)%%/g, (_, i) => mathBlocks[Number(i)]);
+  result = result.replace(/%%MATHINLINE_(\d+)%%/g, (_, i) => mathInlines[Number(i)]);
+
   return result;
 }
 
-function useDebounce(value: string, delay: number) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
-
 export default function MarkdownRenderer({ content }: Props) {
-  console.log(normalizeMarkdown(content))
   const debouncedContent = useDebounce(content, 10);
+  console.log(content)
+
   return (
-    <div  className="prose max-w-none">
+    <div className="prose max-w-none
+      [&_table]:border-collapse
+      [&_table]:w-full
+      [&_table]:text-sm
+      [&_th]:border
+      [&_th]:border-gray-300
+      [&_th]:bg-gray-100
+      [&_th]:px-3
+      [&_th]:py-2
+      [&_th]:text-left
+      [&_td]:border
+      [&_td]:border-gray-300
+      [&_td]:px-3
+      [&_td]:py-2
+      [&_tr:nth-child(even)]:bg-gray-50
+      [&_table]:overflow-x-auto
+    ">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}

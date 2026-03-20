@@ -2,6 +2,10 @@
 import React, { useEffect, useRef, useState } from "react"
 import { Send, StopCircle } from "react-feather"
 import type { Message } from '../types/message'
+import type { Equation } from '../types/linear'
+import axios from "axios"
+//import ReactMarkdown from "react-markdown"
+//import remarkGfm from "remark-gfm"
 import MarkdownRenderer from "./MarkdownRenderer"
 
 
@@ -71,7 +75,7 @@ export default function ChatGPT() {
             </div>
             ) : (
             // BOT → markdown
-            <MarkdownRenderer content={m.text} isStreaming={m.streaming ?? false} />
+            <MarkdownRenderer content={m.text} />
             //<LatexRenderer text={m.text}/>
             )}
 
@@ -117,8 +121,8 @@ export default function ChatGPT() {
       }
 
       // append chunk to bot message
-      data = data.replace(/\n\n+/g, "\n");
-      data = data.replace(/\n{2,}/g, "\n");
+      //data = data.replace(/\n\n+/g, "\n");
+      //data = data.replace(/\n{2,}/g, "\n");
       setMessages((arr) =>
         arr.map((m) => (m.id === botId ? { ...m, text: m.text + data } : m))
       );
@@ -158,10 +162,10 @@ export default function ChatGPT() {
         <div className="flex items-center gap-3">
           <img
             src="/assets/cakapgpt.jpg" 
-            alt="CakapGPT Logo"
+            alt="OKAPP Logo"
             className="w-20 h-10 object-contain rounded-md"
           />
-          <div className="text-sm font-semibold">Smart Conversation with CakapGPT</div>
+          <div className="text-sm font-semibold">Ask Anything to CakapGPT</div>
         </div>
 
         <div className="flex items-center gap-2">

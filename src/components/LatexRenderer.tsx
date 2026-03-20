@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 
 // --- Types ---
 type Segment =
@@ -84,7 +88,6 @@ export default function LatexRenderer({ text }: MathRendererProps) {
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
     >
-        {normalizeMarkdown(content)}
     </ReactMarkdown>
     </div>
 }
