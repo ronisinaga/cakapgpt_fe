@@ -19,6 +19,9 @@ const Home = () => {
     setOpenMenus((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  //Tambahkan state untuk mobile
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const menuTree = [
     {
       key: "llm",
@@ -58,7 +61,9 @@ const Home = () => {
 
   const startDragging = () => !isCollapsed && setIsDragging(true);
   const stopDragging = () => setIsDragging(false);
-  const [isRightCollapsed, setIsRightCollapsed] = useState(false);
+  const [isRightCollapsed, setIsRightCollapsed] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
   const [rightWidth, setRightWidth] = useState(280);
 
   const handleMouseMove = (e: MouseEvent) => {
@@ -77,51 +82,96 @@ const Home = () => {
     };
   });
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setIsRightCollapsed(true);
+      }else {
+        setIsRightCollapsed(false); 
+      }
+    };
+    handleResize(); // jalankan saat pertama load
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-gray-50 text-gray-900">
 
       {/* HEADER */}
-      <header className="h-16 border-b bg-white px-6 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4 cursor-pointer select-none">
+      <header className="h-16 border-b bg-white px-4 md:px-6 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3 cursor-pointer select-none">
           <Menu
             size={22}
             className="opacity-70 hover:opacity-100 transition"
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={() => {
+              if (window.innerWidth < 768) {
+                setIsMobileMenuOpen(!isMobileMenuOpen);
+              } else {
+                setIsCollapsed(!isCollapsed);
+              }
+            }}
           />
-
-          {/* LOGO + TEXT */}
           <div className="flex items-center gap-3">
             <img
               src="/assets/logo.jpg"
               alt="OKAPP Logo"
               className="h-10 w-auto object-contain"
             />
-
             {!isCollapsed && (
-              <span className="font-bold text-xl text-gray-800 tracking-wide">
+              <span className="font-bold text-sm md:text-xl text-gray-800 tracking-wide hidden sm:block">
                 - Large Language Model (LLM), Machine Learning and Deep Learning Application
               </span>
             )}
           </div>
         </div>
-        <p className="text-sm opacity-50">v1.0</p>
+        <div className="flex items-center gap-2">
+          <button
+            className="md:hidden p-2 rounded hover:bg-gray-100 text-gray-600"
+            onClick={() => setIsRightCollapsed(!isRightCollapsed)}
+          >
+            👤
+          </button>
+          <p className="text-sm opacity-50">v1.0</p>
+        </div>
       </header>
+
+      {/* MOBILE OVERLAY */}
+      {isMobileMenuOpen && (
+        <div
+          className="md:hidden"
+          style={{
+            position: "fixed",
+            top: "64px",
+            left: 0,
+            bottom: 0,
+            width: isCollapsed ? 60 : sidebarWidth,
+            zIndex: 39,
+          }}
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
 
       {/* LAYOUT */}
       <div className="flex flex-1 overflow-hidden">
 
         {/* SIDEBAR */}
         <aside
-          className="bg-white border-r border-gray-200 shadow-sm  transition-all duration-200 flex flex-col"
+          className={`
+            bg-white border-r border-gray-200 shadow-sm flex flex-col
+            fixed md:relative top-16 md:top-0 bottom-0 z-50
+            transition-all duration-200
+            ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
+            md:translate-x-0
+          `}
           style={{ width: isCollapsed ? 60 : sidebarWidth }}
         >
+          {/* ISI SIDEBAR TIDAK BERUBAH - copy paste dari kode asal */}
           <div className="px-4 py-5">
             {!isCollapsed && <h2 className="font-semibold text-lg mb-4">Menu</h2>}
-
             <ul className="space-y-1">
               {menuTree.map((item) => (
                 <li key={item.key}>
-                  {/* Parent item */}
                   <div
                     className="flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer hover:bg-gray-100 text-gray-700 text-[14px] select-none"
                     onClick={() => toggleMenu(item.key)}
@@ -130,13 +180,9 @@ const Home = () => {
                     {!isCollapsed && (
                       <>
                         <span className="flex-1">{item.label}</span>
-
-                        {/* Badge jumlah children */}
                         <span className="text-[11px] bg-gray-100 text-gray-500 rounded-full px-1.5 py-0.5 leading-none">
                           {item.children.length}
                         </span>
-
-                        {/* Chevron */}
                         <span
                           className="text-gray-400 text-xs transition-transform duration-200 ml-1"
                           style={{
@@ -149,19 +195,20 @@ const Home = () => {
                       </>
                     )}
                   </div>
-
-                  {/* Children */}
                   {!isCollapsed && openMenus[item.key] && (
                     <ul className="ml-5 border-l border-gray-200 pl-2 mt-1 space-y-1">
                       {item.children.map((child, idx) => (
                         <li
                           key={idx}
-                          onClick={() => setActiveMenu(child.key)}
+                          onClick={() => {
+                            setActiveMenu(child.key);
+                            setIsMobileMenuOpen(false); // tutup drawer saat pilih menu
+                          }}
                           className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-[13px]
-                          ${activeMenu === child.key
-                            ? "bg-blue-50 text-blue-600 font-medium"
-                            : "hover:bg-gray-100 text-gray-600"
-                          }`}
+                            ${activeMenu === child.key
+                              ? "bg-blue-50 text-blue-600 font-medium"
+                              : "hover:bg-gray-100 text-gray-600"
+                            }`}
                         >
                           <img
                             src={child.image}
@@ -188,7 +235,7 @@ const Home = () => {
         )}
 
         {/* MAIN CONTENT */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-3 md:p-6">
           {activeMenu === "cakapgpt" && <ChatGPT />}
           {activeMenu === "" && (
             <div className="flex items-center justify-center h-full text-gray-400">
@@ -198,14 +245,17 @@ const Home = () => {
         </div>
         {/* RIGHT SIDEBAR */}
         <aside
-          className="bg-white border-l border-gray-200 shadow-sm transition-all duration-200 flex flex-col"
+          className={`
+            bg-white border-l border-gray-200 shadow-sm flex flex-col
+            fixed md:relative top-16 md:top-0 bottom-0 right-0 z-50
+            transition-all duration-200
+            ${isRightCollapsed ? "translate-x-full md:translate-x-0" : "translate-x-0 md:translate-x-0"}
+          `}
           style={{ width: isRightCollapsed ? 60 : rightWidth }}
         >
-
           {/* HEADER SIDEBAR KANAN */}
           <div className="flex items-center justify-between p-4 border-b">
             {!isRightCollapsed && <h2 className="font-semibold text-lg">Founder</h2>}
-            
             <button
               onClick={() => setIsRightCollapsed(!isRightCollapsed)}
               className="p-2 rounded hover:bg-gray-100"
@@ -216,7 +266,7 @@ const Home = () => {
 
           {/* KONTEN SIDEBAR */}
           {!isRightCollapsed && (
-            <div className="flex-1 overflow-auto p-4 text-sm text-gray-700 space-y-6">
+            <div className="flex-1 overflow-auto p-4 text-sm text-gray-700 space-y-5">
 
               {/* Foto & Nama */}
               <section className="text-center">
@@ -231,7 +281,7 @@ const Home = () => {
               </section>
 
               {/* Divider */}
-              <hr className="border-gray-10" />
+              <hr className="border-gray-100" />
 
               {/* Bio */}
               <section className="space-y-3">
@@ -270,7 +320,7 @@ const Home = () => {
               </section>
 
               {/* Divider */}
-              <hr className="border-gray-10" />
+              <hr className="border-gray-100" />
 
               {/* Contact */}
               <section>
@@ -283,14 +333,14 @@ const Home = () => {
                   dragonif01@gmail.com
                 </a>
               </section>
+
             </div>
           )}
-
         </aside>
       </div>
 
       {/* FOOTER */}
-      <footer className="h-12 border-t bg-white flex items-center justify-center text-sm text-gray-500">
+      <footer className="h-12 border-t bg-white flex items-center justify-center text-center text-xs md:text-sm text-gray-500 px-4">
         © {new Date().getFullYear()} — Developed by Roni Fitriandi Sinaga to implement knowledge and experience in AI, Machine Learning and Deep Learning ❤️
       </footer>
     </div>
