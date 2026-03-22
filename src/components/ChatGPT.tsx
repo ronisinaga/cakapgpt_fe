@@ -127,9 +127,16 @@ export default function ChatGPT() {
     es.onerror = (err) => {
       console.error("SSE Error:", err);
       // mark bot as finished with error flag
-      setMessages((arr) =>
+      /*setMessages((arr) =>
         arr.map((m) => m.id === botId ? { ...m, streaming: false, text: m.text + " [error]" } : m)
-      )
+      )*/
+      setMessages((arr) =>
+        arr.map((m) => m.id === botId ? { 
+          ...m, 
+          streaming: false, 
+          text: m.text || "Maaf, layanan sedang sibuk. Silakan coba beberapa menit lagi." 
+        } : m)
+      );
       setIsStreaming(false)
       es.close()
       evtRef.current = null
