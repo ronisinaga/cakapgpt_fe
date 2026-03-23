@@ -24,6 +24,46 @@ function normalizeMarkdown(text: string) {
     .replace(/•\s*/g, "- ")
     .replace(/<br\s*\/?>/gi, "\n");
 
+  //Hapus backtick yang membungkus ekspresi math
+  // Contoh: `$v_f \approx 93.56$` → \(v_f \approx 93.56\)
+  result = result.replace(/`(\$[^`]+\$)`/g, (_, content) => {
+    // Hapus $ di awal dan akhir lalu bungkus dengan \(...\)
+    const inner = content.replace(/^\$|\$$/g, "").trim();
+    return `\\(${inner}\\)`;
+  });
+
+  //Hapus backtick yang membungkus LaTeX tanpa $
+  // Contoh: `v_f \approx 93.56 \, \text{m/s}` → \(v_f \approx 93.56\)
+  result = result.replace(/`([^`]*\\[a-zA-Z][^`]*)`/g, (_, content) => {
+    return `\\(${content.trim()}\\)`;
+  });
+
+  //Hapus backtick yang mengandung $ atau \
+  result = result.replace(/`([^`]*(?:\$|\\)[^`]*)`/g, (_, content) => {
+    const converted = content.replace(
+      /\$([^$]+)\$/g,
+      (_: string, inner: string) => `\\(${inner}\\)`
+    );
+    return converted;
+  });
+
+  //Hapus * di awal baris yang bukan list
+  result = result.replace(/^\*(?!\s*[\*\-\s])\s*/gm, "");
+
+  //Hapus backtick yang membungkus teks biasa + math campuran
+  result = result.replace(/^`([^`]+)`$/gm, (_, content) => {
+    const hasNormalText = /[a-zA-Z\s]{3,}/.test(content);
+    if (hasNormalText) return content;
+    return `\`${content}\``;
+  });
+
+  // Konversi $...$ ke \(...\) SEBELUM ekstrak math blocks
+  // Skip $$ dan angka setelah $ (mata uang)
+  result = result.replace(/(?<!\$)\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g, (match, content) => {
+    if (/^\d/.test(content.trim())) return match;
+    return `\\(${content}\\)`;
+  });
+
   // Simpan semua block math dulu sebelum diproses
   const mathBlocks: string[] = [];
   const mathInlines: string[] = [];
@@ -42,7 +82,39 @@ function normalizeMarkdown(text: string) {
     return `%%MATHINLINE_${idx}%%`;
   });
 
-  // ✅ FIX: Pastikan ada baris kosong antara teks/label dan baris tabel pertama
+  // Konversi **Heading:** menjadi ### Heading
+  result = result.replace(/^\*\*([^*\n]+):\*\*$/gm, (_, content) => {
+    return `### ${content}:`;
+  });
+  result = result.replace(/^\*\*([^*\n]+):\*\*\s+/gm, (_, content) => {
+    return `### ${content}:\n`;
+  });
+
+  // Hapus bold yang membungkus seluruh kalimat panjang
+  result = result.replace(/\*\*([^*\n]+)\*\*/g, (match, content) => {
+    const wordCount = content.trim().split(/\s+/).length;
+    if (wordCount > 8) return content;
+    return match;
+  });
+
+  //Hapus LaTeX di dalam sel tabel SETELAH math diekstrak
+  // Sehingga hanya LaTeX yang tersisa di tabel yang dibersihkan
+  result = result.replace(/^\|.+\|$/gm, (row) => {
+    return row
+      .replace(/\\\(|\\\)|\\\[|\\\]/g, "")  // hapus delimiter LaTeX
+      .replace(/\\_/g, "_")                  // hapus escape underscore
+      .replace(/\\([a-zA-Z])/g, "$1");       // hapus backslash sebelum huruf
+  });
+
+  // Pisahkan teks: | tabel → teks\n\n| tabel
+  result = result.replace(
+    /^([^|]+):\s*(\|.+)$/gm,
+    (_, textBefore, tableRow) => {
+      return `${textBefore.trim()}:\n\n${tableRow.trim()}`;
+    }
+  );
+
+  //FIX: Pastikan ada baris kosong antara teks/label dan baris tabel pertama
   // Menangkap kasus: "**Label:**\n| ..." → "**Label:**\n\n| ..."
   result = result.replace(/([^\n])\n(\|)/g, "$1\n\n$2");
 
@@ -87,8 +159,11 @@ function normalizeMarkdown(text: string) {
   result = result.replace(/%%MATHBLOCK_(\d+)%%/g, (_, i) => mathBlocks[Number(i)]);
   result = result.replace(/%%MATHINLINE_(\d+)%%/g, (_, i) => mathInlines[Number(i)]);
 
-  return result;
-}
+  const boldMatches = result.match(/\*\*[^*\n]+\*\*/g);
+  if (boldMatches) console.log("BOLD:", JSON.stringify(boldMatches));
+
+    return result;
+  }
 
 export default function MarkdownRenderer({ content }: Props) {
   const debouncedContent = useDebounce(content, 10);
@@ -115,6 +190,31 @@ export default function MarkdownRenderer({ content }: Props) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
+        components={{
+          h2: ({ children }: any) => (
+            <h2 style={{
+              fontSize: 16,
+              fontWeight: 600,
+              marginTop: 16,
+              marginBottom: 6,
+              color: "#111"
+            }}>
+              {children}
+            </h2>
+          ),
+          h3: ({ children }: any) => (
+            <h3 style={{
+              fontSize: 15,
+              fontWeight: 600,
+              marginTop: 12,
+              marginBottom: 4,
+              color: "#111"
+            }}>
+              {children}
+            </h3>
+          ),
+          // ... komponen lainnya
+        }}
       >
         {normalizeMarkdown(debouncedContent)}
       </ReactMarkdown>

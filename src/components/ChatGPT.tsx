@@ -2,12 +2,14 @@
 import React, { useEffect, useRef, useState } from "react"
 import { Send, StopCircle } from "react-feather"
 import type { Message } from '../types/message'
-import MarkdownRenderer from "./MarkdownRenderer"
+//import MarkdownRenderer from "./MarkdownRenderer"
+import ChatInput from "./ChatInput";
+import ChatBubble from "./ChatBubble";
 
 
 
 export default function ChatGPT() {
-  const [input, setInput] = useState("");
+  //const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   //const [messages, setMessages] = useState([{ sender: "ai", text: "" }]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -33,13 +35,13 @@ export default function ChatGPT() {
   }
 
   // send handler
-  const handleSend = (e?: React.FormEvent) => {
+  /*const handleSend = (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) return;
     startStream(trimmed);
     setInput("");
-  };
+  };*/
 
   // stop streaming
   const stopStream = () => {
@@ -51,38 +53,6 @@ export default function ChatGPT() {
     setMessages((arr) => arr.map((m) => (m.streaming ? { ...m, streaming: false } : m)));
     setIsStreaming(false);
   };
-
-  // simple bubble component
-  const Bubble: React.FC<{ m: Message }> = ({ m }) => {
-    const isUser = m.role === "user";
-
-    return (
-        <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
-        <div
-            className={`
-            w-full max-w-[80%] rounded-xl p-4 text-gray-900 shadow
-            ${isUser ? "bg-black text-white" : "bg-white text-gray-900 shadow"}
-            `}
-        >
-            {isUser ? (
-            // USER → teks biasa
-            <div className="whitespace-pre-wrap text-sm text-white break-words text-right">
-                {m.text}
-            </div>
-            ) : (
-            // BOT → markdown
-            <MarkdownRenderer content={m.text} isStreaming={m.streaming ?? false} />
-            //<LatexRenderer text={m.text}/>
-            )}
-
-            <div className="text-xs opacity-60 mt-2) text-right">
-            {m.time}
-            </div>
-        </div>
-        </div>
-    );
-  };
-
 
   const writeToPage = (prompt:string, url:string) =>{
     // push user message
@@ -134,7 +104,7 @@ export default function ChatGPT() {
         arr.map((m) => m.id === botId ? { 
           ...m, 
           streaming: false, 
-          text: m.text || "Maaf, layanan sedang sibuk. Silakan coba beberapa menit lagi." 
+          text: m.text 
         } : m)
       );
       setIsStreaming(false)
@@ -146,8 +116,15 @@ export default function ChatGPT() {
   const LLM = async(prompt:string)=>{
 
     try{
-      //const url = `http://localhost:8000/api/v1/chat/stream?prompt=${prompt}`
-      const url = `/api/v1/chat/stream?prompt=${encodeURIComponent(prompt)}`
+      //Ambil history dari messages yang sudah ada
+      const history = messages
+        .filter(m => !m.streaming && m.text.trim() !== "")
+        .map(m => ({
+          role: m.role === "user" ? "user" : "assistant",
+          content: m.text
+      }));
+      //const url = `http://localhost:8000/api/v1/chat/stream?prompt=${encodeURIComponent(prompt)}&history=${encodeURIComponent(JSON.stringify(history))}`
+      const url = `/api/v1/chat/stream?prompt=${encodeURIComponent(prompt)}&history=${encodeURIComponent(JSON.stringify(history))}`
       writeToPage(prompt,url)
 
     }catch(error){
@@ -189,38 +166,21 @@ export default function ChatGPT() {
 
         {messages.map((m) => (
           <div key={m.id} className="w-full">
-            <Bubble m={m} />
-            {/* typing cursor for streaming bot */}
-            {m.role === "bot" && m.streaming && (
-              <div className="flex justify-start mb-4 pl-1">
-                <div className="bg-gray-100 p-2 rounded-lg text-gray-400 animate-pulse">▍</div>
-              </div>
+            <ChatBubble m={m} />
+              {m.role === "bot" && m.streaming && (
+                <div className="flex justify-start mb-4 pl-1">
+                  <div className="bg-gray-100 p-2 rounded-lg text-gray-400 animate-pulse">▍</div>
+                </div>
             )}
           </div>
         ))}
       </div>
 
       {/* input */}
-      <form onSubmit={handleSend} className="flex items-center w-full p-4 border-t bg-white">
-        <div className="flex items-center w-full border rounded-full px-4 py-2 shadow-sm">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Write your discussion..."
-            className="flex-1 resize-none outline-none bg-transparent p-2"
-          />
-          <div className="flex items-center gap-2">
-            <button
-              type="submit"
-              disabled={!input.trim() || isStreaming}
-              className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-md disabled:opacity-50"
-            >
-              <Send size={16} />
-              <span className="text-sm">Send</span>
-            </button>
-          </div>
-        </div>
-      </form>
+      <ChatInput
+        onSend={(text) => startStream(text)}
+        isStreaming={isStreaming}
+      />
     </div>
   );
 }
