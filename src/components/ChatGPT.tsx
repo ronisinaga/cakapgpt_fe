@@ -105,7 +105,9 @@ export default function ChatGPT() {
         arr.map((m) => m.id === botId ? { 
           ...m, 
           streaming: false, 
-          text: m.text 
+          text: m.text.trim() === "" 
+          ? "Maaf, koneksi terputus. Silakan coba lagi." 
+          : m.text 
         } : m)
       );
       setIsStreaming(false)
