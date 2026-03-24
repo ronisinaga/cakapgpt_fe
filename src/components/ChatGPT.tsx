@@ -85,6 +85,7 @@ export default function ChatGPT() {
         evtRef.current = null;
         return;
       }
+      console.log("DATA:", JSON.stringify(data));
 
       // append chunk to bot message
       data = data.replace(/\n\n+/g, "\n");
