@@ -72,12 +72,25 @@ export default function ChatGPT() {
       // console.log("SSE open");
     };
 
+    //Timeout fallback - jika 30 detik tidak ada [DONE]
+    const timeout = setTimeout(() => {
+      console.log("SSE timeout - forcing streaming to false");
+      setMessages((arr) =>
+        arr.map((m) => m.id === botId ? { ...m, streaming: false } : m)
+      );
+      setIsStreaming(false);
+      es.close();
+      evtRef.current = null;
+    }, 30000);
+
     es.onmessage = (e) => {
       let data = e.data
       if (!data) return
 
       // sentinel for end of stream
+      data = data.replace(/<think>[\s\S]*?<\/think>/g, '');
       if (data === "[DONE]") {
+        clearTimeout(timeout);
         // finalize: remove streaming flag
         setMessages((arr) => arr.map(m => m.id === botId ? { ...m, streaming: false } : m));
         setIsStreaming(false);
@@ -96,6 +109,7 @@ export default function ChatGPT() {
     };
 
     es.onerror = (err) => {
+      clearTimeout(timeout);
       console.error("SSE Error:", err);
       // mark bot as finished with error flag
       /*setMessages((arr) =>
@@ -121,13 +135,13 @@ export default function ChatGPT() {
     try{
       //Ambil history dari messages yang sudah ada
       const history = messages
-        .filter(m => !m.streaming && m.text.trim() !== "")
+        .filter(m => !m.streaming && m.text.trim() !== "" && m.role === "user")
         .map(m => ({
-          role: m.role === "user" ? "user" : "assistant",
+          role: "user" as const,
           content: m.text
       }));
-      //const url = `http://localhost:8000/api/v1/chat/stream?prompt=${encodeURIComponent(prompt)}&history=${encodeURIComponent(JSON.stringify(history))}`
-      const url = `/api/v1/chat/stream?prompt=${encodeURIComponent(prompt)}&history=${encodeURIComponent(JSON.stringify(history))}`
+      const url = `http://localhost:8000/api/v1/chat/stream?prompt=${encodeURIComponent(prompt)}&history=${encodeURIComponent(JSON.stringify(history))}`
+      //const url = `/api/v1/chat/stream?prompt=${encodeURIComponent(prompt)}&history=${encodeURIComponent(JSON.stringify(history))}`
       writeToPage(prompt,url)
 
     }catch(error){

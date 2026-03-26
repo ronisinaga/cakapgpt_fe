@@ -2,16 +2,14 @@
 import React, { useEffect, useRef, useState } from "react"
 import { Send, StopCircle } from "react-feather"
 import type { Message } from '../types/message'
-import type { Equation } from '../types/linear'
-import axios from "axios"
-//import ReactMarkdown from "react-markdown"
-//import remarkGfm from "remark-gfm"
-import MarkdownRenderer from "./MarkdownRenderer"
+//import MarkdownRenderer from "./MarkdownRenderer"
+import ChatInput from "./ChatInput";
+import ChatBubble from "./ChatBubble";
 
 
 
 export default function ChatGPT() {
-  const [input, setInput] = useState("");
+  //const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   //const [messages, setMessages] = useState([{ sender: "ai", text: "" }]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -37,13 +35,13 @@ export default function ChatGPT() {
   }
 
   // send handler
-  const handleSend = (e?: React.FormEvent) => {
+  /*const handleSend = (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) return;
     startStream(trimmed);
     setInput("");
-  };
+  };*/
 
   // stop streaming
   const stopStream = () => {
@@ -56,100 +54,103 @@ export default function ChatGPT() {
     setIsStreaming(false);
   };
 
-  // simple bubble component
-  const Bubble: React.FC<{ m: Message }> = ({ m }) => {
-    const isUser = m.role === "user";
-
-    return (
-        <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
-        <div
-            className={`
-            w-full max-w-[80%] rounded-xl p-4 text-gray-900 shadow
-            ${isUser ? "bg-black text-white" : "bg-white text-gray-900 shadow"}
-            `}
-        >
-            {isUser ? (
-            // USER → teks biasa
-            <div className="whitespace-pre-wrap text-sm text-white break-words text-right">
-                {m.text}
-            </div>
-            ) : (
-            // BOT → markdown
-            <MarkdownRenderer content={m.text} />
-            //<LatexRenderer text={m.text}/>
-            )}
-
-            <div className="text-xs opacity-60 mt-2) text-right">
-            {m.time}
-            </div>
-        </div>
-        </div>
-    );
-  };
-
-
-  const writeToPage = (prompt:string, url:string) =>{
-    // push user message
+  const writeToPage = (prompt: string, history: any[]) => {
     const userMsg: Message = { id: makeId(), role: "user", text: prompt, time: new Date().toLocaleTimeString() };
     setMessages((s) => [...s, userMsg]);
 
-    // add placeholder bot message
     const botId = makeId();
     const botMsg: Message = { id: botId, role: "bot", text: "", streaming: true, time: new Date().toLocaleTimeString() };
-    setMessages((s) => [...s, botMsg])
+    setMessages((s) => [...s, botMsg]);
+    setIsStreaming(true);
 
-    const es = new EventSource(url, { withCredentials: false })
-    evtRef.current = es
-    setIsStreaming(true)
+    // ✅ Pakai fetch dengan POST, lalu baca stream manual
+    const controller = new AbortController();
+    evtRef.current = null;
 
-    es.onopen = () => {
-      // console.log("SSE open");
-    };
-
-    es.onmessage = (e) => {
-      let data = e.data
-      if (!data) return
-
-      // sentinel for end of stream
-      if (data === "[DONE]") {
-        // finalize: remove streaming flag
-        setMessages((arr) => arr.map(m => m.id === botId ? { ...m, streaming: false } : m));
-        setIsStreaming(false);
-        es.close();
-        evtRef.current = null;
-        return;
-      }
-
-      // append chunk to bot message
-      //data = data.replace(/\n\n+/g, "\n");
-      //data = data.replace(/\n{2,}/g, "\n");
+    const timeout = setTimeout(() => {
+      controller.abort();
       setMessages((arr) =>
-        arr.map((m) => (m.id === botId ? { ...m, text: m.text + data } : m))
+        arr.map((m) => m.id === botId ? { ...m, streaming: false } : m)
       );
-    };
+      setIsStreaming(false);
+    }, 60000);
 
-    es.onerror = (err) => {
-      console.error("SSE Error:", err);
-      // mark bot as finished with error flag
+    fetch("http://localhost:8000/api/v1/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, history }),
+      signal: controller.signal,
+    })
+    .then(res => {
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+
+      const read = () => {
+        reader.read().then(({ done, value }) => {
+          if (done) {
+            clearTimeout(timeout);
+            setMessages((arr) =>
+              arr.map((m) => m.id === botId ? { ...m, streaming: false } : m)
+            );
+            setIsStreaming(false);
+            return;
+          }
+
+          console.log("VALUE:"+value)
+
+          const text = decoder.decode(value);
+          const lines = text.split("\n");
+
+          for (const line of lines) {
+            console.log(line)
+            if (line.startsWith("data: ")) {
+              //const data = line.replace("data: ", "").trim();
+              let data = line.slice(6)
+              data = data.replace(/\r|(\[DONE\])/g, '');
+              if (data === "[DONE]") {
+                clearTimeout(timeout);
+                setMessages((arr) =>
+                  arr.map((m) => m.id === botId ? { ...m, streaming: false } : m)
+                );
+                setIsStreaming(false);
+                return;
+              }
+              if (data !== "") {
+                setMessages((arr) =>
+                  arr.map((m) => m.id === botId ? { ...m, text: m.text + data } : m)
+                );
+              }
+            }
+          }
+          read();
+        });
+      };
+      read();
+    })
+    .catch(err => {
+      clearTimeout(timeout);
+      console.log("Fetch error:", err);
       setMessages((arr) =>
-        arr.map((m) => m.id === botId ? { ...m, streaming: false, text: m.text + " [error]" } : m)
-      )
-      setIsStreaming(false)
-      es.close()
-      evtRef.current = null
-    }
-  }
+        arr.map((m) => m.id === botId ? {
+          ...m,
+          streaming: false,
+          text: m.text.trim() === "" ? "Maaf, koneksi terputus. Silakan coba lagi." : m.text
+        } : m)
+      );
+      setIsStreaming(false);
+  });
+};
 
-  const LLM = async(prompt:string)=>{
+const LLM = async (prompt: string) => {
+  const history = messages
+    .filter(m => !m.streaming && m.text.trim() !== "")
+    .map(m => ({
+      role: m.role === "user" ? "user" : "assistant",
+      content: m.text
+    }));
 
-    try{
-      const url = `http://localhost:8000/api/v1/chat/stream?prompt=${prompt}`
-      writeToPage(prompt,url)
-
-    }catch(error){
-      console.log("Error:",error)
-    }
-  }
+  writeToPage(prompt, history);
+};
 
   const process = (prompt:string)=>{
     LLM(prompt)
@@ -162,10 +163,10 @@ export default function ChatGPT() {
         <div className="flex items-center gap-3">
           <img
             src="/assets/cakapgpt.jpg" 
-            alt="OKAPP Logo"
+            alt="CakapGPT Logo"
             className="w-20 h-10 object-contain rounded-md"
           />
-          <div className="text-sm font-semibold">Ask Anything to CakapGPT</div>
+          <div className="text-sm font-semibold">Smart AI Conversation with CakapGPT</div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -185,38 +186,21 @@ export default function ChatGPT() {
 
         {messages.map((m) => (
           <div key={m.id} className="w-full">
-            <Bubble m={m} />
-            {/* typing cursor for streaming bot */}
-            {m.role === "bot" && m.streaming && (
-              <div className="flex justify-start mb-4 pl-1">
-                <div className="bg-gray-100 p-2 rounded-lg text-gray-400 animate-pulse">▍</div>
-              </div>
+            <ChatBubble m={m} />
+              {m.role === "bot" && m.streaming && (
+                <div className="flex justify-start mb-4 pl-1">
+                  <div className="bg-gray-100 p-2 rounded-lg text-gray-400 animate-pulse">▍</div>
+                </div>
             )}
           </div>
         ))}
       </div>
 
       {/* input */}
-      <form onSubmit={handleSend} className="flex items-center w-full p-4 border-t bg-white">
-        <div className="flex items-center w-full border rounded-full px-4 py-2 shadow-sm">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Tulis pertanyaan..."
-            className="flex-1 resize-none outline-none bg-transparent p-2"
-          />
-          <div className="flex items-center gap-2">
-            <button
-              type="submit"
-              disabled={!input.trim() || isStreaming}
-              className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-md disabled:opacity-50"
-            >
-              <Send size={16} />
-              <span className="text-sm">Kirim</span>
-            </button>
-          </div>
-        </div>
-      </form>
+      <ChatInput
+        onSend={(text) => startStream(text)}
+        isStreaming={isStreaming}
+      />
     </div>
   );
 }
